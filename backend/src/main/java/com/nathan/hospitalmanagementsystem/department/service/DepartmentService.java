@@ -1,14 +1,20 @@
 package com.nathan.hospitalmanagementsystem.department.service;
 
+import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
 import com.nathan.hospitalmanagementsystem.department.entity.Department;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentAlreadyExistsException;
+import com.nathan.hospitalmanagementsystem.department.exception.DepartmentNotFoundException;
 import com.nathan.hospitalmanagementsystem.department.repository.DepartmentRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -40,6 +46,32 @@ public class DepartmentService {
         }
     }
 
+
+    @Transactional
+    public DepartmentResponse getDepartmentById(Long id){
+        return departmentRepository.findById(id)
+                .map(DepartmentResponse::from)
+                .orElseThrow(()-> new DepartmentNotFoundException(id));
+    }
+
+
+    @Transactional
+    public PaginatedResponse<DepartmentResponse> getDepartments(int page, int size, boolean activeOnly){
+        Sort sort = Sort.by(Sort.Order.asc("name"),
+                Sort.Order.asc("id"));
+
+
+        Pageable pageable = PageRequest.of(page,size,sort);
+
+        Page<Department> departments = activeOnly
+                ? departmentRepository.findByActiveTrue(pageable)
+                : departmentRepository.findAll(pageable);
+
+        Page<DepartmentResponse> response = departments.map(DepartmentResponse::from);
+
+        return PaginatedResponse.from(response);
+    }
+
     private boolean isDuplicateNameViolation(DataIntegrityViolationException exception){
         Throwable cause = exception;
 
@@ -54,5 +86,10 @@ public class DepartmentService {
 
         return false;
     }
+
+
+
+
+
 
 }
