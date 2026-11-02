@@ -3,6 +3,7 @@ package com.nathan.hospitalmanagementsystem.department.service;
 import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.entity.Department;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentAlreadyExistsException;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentNotFoundException;
@@ -11,6 +12,8 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -350,6 +353,262 @@ public class DepartmentServiceTest {
                 () -> assertFalse(response.isFirst()),
                 () -> assertTrue(response.isLast())
         );
+    }
+
+    @Test
+    void updateDepartment_shouldUpdateExistingDepartmentAndReturnResponse() {
+        Department department = Department.create(
+                "Cardiology",
+                "Heart consultations"
+        );
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest(
+                "  Advanced Cardiology  ",
+                "  Specialist heart consultations  "
+        );
+
+        Department persisted = storedDepartment(
+                1L,
+                "Advanced Cardiology",
+                true
+        );
+
+        when(persisted.getDescription())
+                .thenReturn("Specialist heart consultations");
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.saveAndFlush(department))
+                .thenReturn(persisted);
+
+        when(departmentRepository.existsByNameIgnoreCaseAndIdNot("Advanced Cardiology", 1L)).thenReturn(false);
+
+        DepartmentResponse response = service.updateDepartmentById(1L, request);
+
+        assertAll(
+                () -> assertEquals(
+                        "Advanced Cardiology",
+                        department.getName()
+                ),
+                () -> assertEquals(
+                        "Specialist heart consultations",
+                        department.getDescription()
+                ),
+                () -> assertTrue(department.isActive()),
+                () -> assertEquals(
+                        new DepartmentResponse(
+                                1L,
+                                "Advanced Cardiology",
+                                "Specialist heart consultations",
+                                true,
+                                localDateTime
+                        ),
+                        response
+                )
+        );
+
+        verify(departmentRepository).existsByNameIgnoreCaseAndIdNot(
+                "Advanced Cardiology",
+                1L
+        );
+
+        verify(departmentRepository).saveAndFlush(department);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Cardiology", "CARDIOLOGY"})
+    void updateDepartment_shouldAllowKeepingOwnNameOrChangingItsCase(
+            String name
+    ) {
+        Department department = Department.create(
+                "Cardiology",
+                "Heart consultations"
+        );
+
+        UpdateDepartmentRequest request =
+                new UpdateDepartmentRequest(name, "Updated description");
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.existsByNameIgnoreCaseAndIdNot(name, 1L))
+                .thenReturn(false);
+
+        when(departmentRepository.saveAndFlush(department))
+                .thenReturn(department);
+
+        DepartmentResponse response = service.updateDepartmentById(1L, request);
+
+        assertAll(
+                () -> assertEquals(name, response.name()),
+                () -> assertEquals(
+                        "Updated description",
+                        response.description()
+                )
+        );
+
+        verify(departmentRepository).existsByNameIgnoreCaseAndIdNot(name, 1L);
+        verify(departmentRepository).saveAndFlush(department);
+    }
+
+    @Test
+    void updateDepartment_shouldClearDescriptionWhenNull() {
+        Department department = Department.create(
+                "Cardiology",
+                "Heart consultations"
+        );
+
+        UpdateDepartmentRequest request =
+                new UpdateDepartmentRequest("Cardiology", null);
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.saveAndFlush(department))
+                .thenReturn(department);
+
+        DepartmentResponse response = service.updateDepartmentById(1L, request);
+
+        assertAll(
+                () -> assertNull(department.getDescription()),
+                () -> assertNull(response.description())
+        );
+
+        verify(departmentRepository).saveAndFlush(department);
+    }
+
+    @Test
+    void updateDepartment_shouldRejectMissingDepartmentBeforeDuplicateCheck() {
+        UpdateDepartmentRequest request =
+                new UpdateDepartmentRequest("Cardiology", null);
+
+        when(departmentRepository.findById(99L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                DepartmentNotFoundException.class,
+                () -> service.updateDepartmentById(99L, request)
+        );
+
+        verify(departmentRepository, never())
+                .existsByNameIgnoreCaseAndIdNot(anyString(), anyLong());
+
+        verify(departmentRepository, never())
+                .saveAndFlush(any(Department.class));
+    }
+
+    @Test
+    void updateDepartment_shouldRejectAnotherDepartmentsNameBeforeMutation() {
+        Department department = Department.create(
+                "Cardiology",
+                "Heart consultations"
+        );
+
+        UpdateDepartmentRequest request =
+                new UpdateDepartmentRequest("Neurology", "New description");
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.existsByNameIgnoreCaseAndIdNot("Neurology", 1L))
+                .thenReturn(true);
+
+        assertThrows(
+                DepartmentAlreadyExistsException.class,
+                () -> service.updateDepartmentById(1L, request)
+        );
+
+        assertAll(
+                () -> assertEquals("Cardiology", department.getName()),
+                () -> assertEquals(
+                        "Heart consultations",
+                        department.getDescription()
+                )
+        );
+
+        verify(departmentRepository, never())
+                .saveAndFlush(any(Department.class));
+    }
+
+    @Test
+    void updateDepartment_shouldTranslateDatabaseDuplicateNameFailure() {
+        Department department = Department.create("Cardiology", null);
+
+        UpdateDepartmentRequest request =
+                new UpdateDepartmentRequest("Neurology", null);
+
+        DataIntegrityViolationException failure =
+                databaseConstraintFailure("ux_departments_name_lower");
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.saveAndFlush(department))
+                .thenThrow(failure);
+
+        DepartmentAlreadyExistsException exception = assertThrows(
+                DepartmentAlreadyExistsException.class,
+                () -> service.updateDepartmentById(1L, request)
+        );
+
+        assertSame(failure, exception.getCause());
+    }
+
+    @Test
+    void updateDepartment_shouldPropagateOtherDatabaseConstraintFailures() {
+        Department department = Department.create("Cardiology", null);
+
+        UpdateDepartmentRequest request =
+                new UpdateDepartmentRequest("Neurology", null);
+
+        DataIntegrityViolationException failure =
+                databaseConstraintFailure("chk_departments_name_not_blank");
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.saveAndFlush(department))
+                .thenThrow(failure);
+
+        DataIntegrityViolationException exception = assertThrows(
+                DataIntegrityViolationException.class,
+                () -> service.updateDepartmentById(1L, request)
+        );
+
+        assertSame(failure, exception);
+    }
+
+    @Test
+    void updateDepartment_shouldRejectInvalidDetailsWithoutSaving() {
+        Department department = Department.create(
+                "Cardiology",
+                "Heart consultations"
+        );
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest(
+                "Neurology",
+                "B".repeat(501)
+        );
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateDepartmentById(1L, request)
+        );
+
+        assertAll(
+                () -> assertEquals("Cardiology", department.getName()),
+                () -> assertEquals(
+                        "Heart consultations",
+                        department.getDescription()
+                )
+        );
+
+        verify(departmentRepository, never())
+                .saveAndFlush(any(Department.class));
     }
 
     private Department storedDepartment(Long id, String name,boolean active){

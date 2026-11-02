@@ -3,6 +3,7 @@ package com.nathan.hospitalmanagementsystem.department.service;
 import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.entity.Department;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentAlreadyExistsException;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentNotFoundException;
@@ -70,6 +71,33 @@ public class DepartmentService {
         Page<DepartmentResponse> response = departments.map(DepartmentResponse::from);
 
         return PaginatedResponse.from(response);
+    }
+
+    @Transactional
+    public DepartmentResponse updateDepartmentById(Long id, UpdateDepartmentRequest request){
+        Department department = departmentRepository.findById(id).orElseThrow(()-> new DepartmentNotFoundException(id));
+
+        if(departmentRepository.existsByNameIgnoreCaseAndIdNot(request.name(),id)){
+            throw new DepartmentAlreadyExistsException(request.name());
+        }
+
+        department.updateDepartment(request.name(),request.description());
+
+
+        try{
+            Department saved = departmentRepository.saveAndFlush(department);
+            return DepartmentResponse.from(saved);
+
+        }
+
+        catch (DataIntegrityViolationException ex){
+            if(isDuplicateNameViolation(ex)){
+                throw new DepartmentAlreadyExistsException(request.name(),ex);
+            }
+
+            throw ex;
+        }
+
     }
 
     private boolean isDuplicateNameViolation(DataIntegrityViolationException exception){

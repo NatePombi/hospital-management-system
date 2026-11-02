@@ -74,7 +74,7 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
-                .message(e.getMessage())
+                .message("Validation Failed")
                 .path(request.getRequestURI())
                 .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
                 .errors(errors).build();
@@ -108,10 +108,17 @@ public class GlobalExceptionHandler {
                         (first, second)-> first
                 ));
 
+        String message = e.getConstraintViolations()
+                .stream()
+                .findFirst()
+                .map(ConstraintViolation::getMessage)
+                .orElse("Validation failed");
+
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
-                .message(e.getMessage())
+                .message(message)
                 .path(request.getRequestURI())
                 .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
                 .errors(errors).build();
