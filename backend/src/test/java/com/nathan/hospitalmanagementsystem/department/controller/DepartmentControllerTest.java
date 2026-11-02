@@ -2,9 +2,9 @@ package com.nathan.hospitalmanagementsystem.department.controller;
 
 import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.common.exception.GlobalExceptionHandler;
-import com.nathan.hospitalmanagementsystem.controller.DepartmentController;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentAlreadyExistsException;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentNotFoundException;
 import com.nathan.hospitalmanagementsystem.department.service.DepartmentService;
@@ -23,15 +23,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(DepartmentController.class)
@@ -346,6 +345,248 @@ public class DepartmentControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void updateDepartment_shouldReturnUpdatedDetailsAndNormalizeInput()
+            throws Exception {
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest(
+                "  Advanced Cardiology  ",
+                "  Specialist heart consultations  "
+        );
+
+        DepartmentResponse response = new DepartmentResponse(
+                1L,
+                "Advanced Cardiology",
+                "Specialist heart consultations",
+                true,
+                localDateTime
+        );
+
+        when(service.updateDepartmentById(
+                eq(1L),
+                any(UpdateDepartmentRequest.class)
+        )).thenReturn(response);
+
+        mockMvc.perform(put("/api/v1/departments/update/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Advanced Cardiology"))
+                .andExpect(jsonPath("$.description")
+                        .value("Specialist heart consultations"))
+                .andExpect(jsonPath("$.active").value(true));
+
+
+        verify(service).updateDepartmentById(
+                1L,
+                new UpdateDepartmentRequest(
+                        "Advanced Cardiology",
+                        "Specialist heart consultations"
+                )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"name\":\"Cardiology\"}",
+            "{\"name\":\"Cardiology\",\"description\":null}"
+    })
+    void updateDepartment_shouldAllowDescriptionToBeCleared(String body)
+            throws Exception {
+
+        DepartmentResponse response = new DepartmentResponse(
+                1L,
+                "Cardiology",
+                null,
+                true,
+                localDateTime
+        );
+
+        when(service.updateDepartmentById(
+                eq(1L),
+                any(UpdateDepartmentRequest.class)
+        )).thenReturn(response);
+
+        mockMvc.perform(put( "/api/v1/departments/update/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(nullValue()));
+
+        verify(service).updateDepartmentById(
+                1L,
+                new UpdateDepartmentRequest("Cardiology", null)
+        );
+    }
+
+    @Test
+    void updateDepartment_shouldAcceptMaximumLengthsAfterTrimming()
+            throws Exception {
+
+        String name = "A".repeat(100);
+        String description = "B".repeat(500);
+
+        DepartmentResponse response = new DepartmentResponse(
+                1L,
+                name,
+                description,
+                true,
+                localDateTime
+        );
+
+        when(service.updateDepartmentById(
+                eq(1L),
+                any(UpdateDepartmentRequest.class)
+        )).thenReturn(response);
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest(name,description);
+
+        mockMvc.perform(put("/api/v1/departments/update/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value(name))
+                .andExpect(jsonPath("$.description").value(description));
+
+        verify(service).updateDepartmentById(
+                1L,
+                new UpdateDepartmentRequest(name, description)
+        );
+    }
+
+    @Test
+    void updateDepartment_shouldReturnNotFoundForMissingDepartment()
+            throws Exception {
+
+        when(service.updateDepartmentById(
+                eq(99L),
+                any(UpdateDepartmentRequest.class)
+        )).thenThrow(new DepartmentNotFoundException(99L));
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest("Cardiology",null);
+
+        mockMvc.perform(put("/api/v1/departments/update/99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message")
+                        .value("Department not found with ID: 99"));
+    }
+
+    @Test
+    void updateDepartment_shouldReturnConflictForDuplicateName()
+            throws Exception {
+
+        when(service.updateDepartmentById(
+                eq(1L),
+                any(UpdateDepartmentRequest.class)
+        )).thenThrow(new DepartmentAlreadyExistsException("Neurology"));
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest("Neurology",null);
+
+
+        mockMvc.perform(put("/api/v1/departments/update/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error")
+                        .value("Conflict"))
+                .andExpect(jsonPath("$.message")
+                        .value("A department named 'Neurology' already exists."));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidRequests")
+    void updateDepartment_shouldRejectInvalidFields(
+            String body,
+            String field,
+            String message
+    ) throws Exception {
+
+        mockMvc.perform(put("/api/v1/departments/update/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Validation Failed"))
+                .andExpect(jsonPath("$.errors." + field)
+                        .value(message));
+
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    void updateDepartment_shouldRejectNonPositiveIds(String id)
+            throws Exception {
+
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest("Neurology",null);
+
+        mockMvc.perform(put("/api/v1/departments/update/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message")
+                        .value("Department ID must be greater than zero"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void updateDepartment_shouldRejectNonNumericId() throws Exception {
+        UpdateDepartmentRequest request = new UpdateDepartmentRequest("Neurology",null);
+
+        mockMvc.perform(put("/api/v1/departments/update/abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.status").value(400));
+
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"name\":", "null", ""})
+    void updateDepartment_shouldRejectUnreadableOrMissingBody(String body)
+            throws Exception {
+
+        mockMvc.perform(put("/api/v1/departments/update/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.status").value(400));
+
+
+        verifyNoInteractions(service);
+    }
+
 
     private DepartmentResponse readResponse(Long id, String name, boolean active){
         return new DepartmentResponse(id,name,"Test Department",active,localDateTime);
@@ -366,11 +607,6 @@ public class DepartmentControllerTest {
                 ),
                 Arguments.of(
                         "{\"name\":null}",
-                        "name",
-                        requiredName
-                ),
-                Arguments.of(
-                        "{\"name\":\"\"}",
                         "name",
                         requiredName
                 ),

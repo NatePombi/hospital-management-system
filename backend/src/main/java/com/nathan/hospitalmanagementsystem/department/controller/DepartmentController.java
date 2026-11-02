@@ -1,8 +1,9 @@
-package com.nathan.hospitalmanagementsystem.controller;
+package com.nathan.hospitalmanagementsystem.department.controller;
 
 import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.service.DepartmentService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -57,7 +58,12 @@ public class DepartmentController {
                                                                                 @RequestParam(name = "activeOnly",defaultValue = "true")
                                                                                 boolean activeOnly
                                                                                 ){
-        return ResponseEntity.ok().body(departmentService.getDepartments(page, size, activeOnly));
+        return ResponseEntity.ok(departmentService.getDepartments(page, size, activeOnly));
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<DepartmentResponse> updateDepartment(@PathVariable  @Positive(message = "Department ID must be greater than zero") Long id, @Valid @RequestBody UpdateDepartmentRequest request){
+        return ResponseEntity.ok(departmentService.updateDepartmentById(id, request));
     }
 
 }

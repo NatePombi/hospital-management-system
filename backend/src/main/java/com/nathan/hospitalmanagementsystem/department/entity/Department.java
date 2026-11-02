@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CurrentTimestamp;
+import org.hibernate.boot.UnsupportedOrmXsdVersionException;
 
 import java.time.LocalDateTime;
 
@@ -35,24 +36,18 @@ public class Department {
     }
 
     public static Department create(String name,String description){
-
-        if(name == null || name.isBlank()){
-            throw new IllegalArgumentException("Department name cannot be null or blank");
-        }
-
-        String normalizedName = name.strip();
-
-        if(normalizedName.length() > 100){
-            throw new IllegalArgumentException("Department name cannot be longer than 100");
-        }
-
-        String normalizedDescription = description == null ? null : description.strip();
-
-        if(normalizedDescription != null && normalizedDescription.length() > 500){
-            throw new IllegalArgumentException("Department description cannot be longer than 500");
-        }
+        String normalizedName = normalizeName(name);
+        String normalizedDescription = normalizeDescription(description);
 
         return new Department(normalizedName,normalizedDescription);
+    }
+
+    public void updateDepartment(String name, String description) {
+        String normalizedName = normalizeName(name);
+        String normalizedDescription = normalizeDescription(description);
+
+        this.name = normalizedName;
+        this.description = normalizedDescription;
     }
 
     @PrePersist
@@ -70,5 +65,32 @@ public class Department {
         this.active = true;
     }
 
+    private static String normalizeName(String name){
+        if(name == null || name.isBlank()){
+            throw new IllegalArgumentException("Department name cannot be null or blank");
+        }
+
+        String normalizedName = name.strip();
+
+        if(normalizedName.length() > 100){
+            throw new IllegalArgumentException("Department name exceed 100 characters");
+        }
+
+        return normalizedName;
+    }
+
+    private static String normalizeDescription(String description){
+        if(description == null){
+            return null;
+        }
+
+        String normalizedDescription = description.strip();
+
+        if(normalizedDescription.length() > 500){
+            throw new IllegalArgumentException("Department description exceed 500 characters");
+        }
+
+        return normalizedDescription;
+    }
 
 }
