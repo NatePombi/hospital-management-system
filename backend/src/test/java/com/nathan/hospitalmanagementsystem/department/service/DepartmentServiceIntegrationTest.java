@@ -74,7 +74,7 @@ public class DepartmentServiceIntegrationTest {
                         "Specialist heart consultations",
                         reloaded.getDescription()
                 ),
-                () -> assertFalse(reloaded.isActive()),
+                () -> assertFalse(reloaded.getActive()),
                 () -> assertEquals(1L, departmentRepository.count())
         );
     }

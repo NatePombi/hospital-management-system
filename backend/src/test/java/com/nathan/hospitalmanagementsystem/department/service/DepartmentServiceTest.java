@@ -4,6 +4,7 @@ import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentStatusRequest;
 import com.nathan.hospitalmanagementsystem.department.entity.Department;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentAlreadyExistsException;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentNotFoundException;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -51,7 +53,7 @@ public class DepartmentServiceTest {
         when(persisted.getName()).thenReturn("Neurology");
         when(persisted.getId()).thenReturn(14L);
         when(persisted.getDescription()).thenReturn("Brain-related consultation");
-        when(persisted.isActive()).thenReturn(true);
+        when(persisted.getActive()).thenReturn(true);
         when(persisted.getCreatedAt()).thenReturn(localDateTime);
 
         when(departmentRepository.existsByNameIgnoreCase("Neurology")).thenReturn(false);
@@ -395,7 +397,7 @@ public class DepartmentServiceTest {
                         "Specialist heart consultations",
                         department.getDescription()
                 ),
-                () -> assertTrue(department.isActive()),
+                () -> assertTrue(department.getActive()),
                 () -> assertEquals(
                         new DepartmentResponse(
                                 1L,
@@ -611,12 +613,96 @@ public class DepartmentServiceTest {
                 .saveAndFlush(any(Department.class));
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "true, false",
+            "false, true",
+            "true, true",
+            "false, false"
+    })
+    void updateDepartmentStatus_shouldApplyRequestedState(
+            boolean initiallyActive,
+            boolean requestedActive
+    ) {
+        Department department = Department.create(
+                "Cardiology",
+                "Heart consultations"
+        );
+
+        if (!initiallyActive) {
+            department.Deactivate();
+        }
+
+        when(departmentRepository.findById(1L))
+                .thenReturn(Optional.of(department));
+
+        when(departmentRepository.saveAndFlush(department))
+                .thenReturn(department);
+
+        DepartmentResponse response = service.updateDepartmentStatus(
+                1L,
+                new UpdateDepartmentStatusRequest(requestedActive)
+        );
+
+        assertAll(
+                () -> assertEquals(
+                        requestedActive,
+                        department.getActive()
+                ),
+                () -> assertEquals(requestedActive, response.active()),
+                () -> assertEquals("Cardiology", response.name()),
+                () -> assertEquals(
+                        "Heart consultations",
+                        response.description()
+                )
+        );
+
+        verify(departmentRepository).saveAndFlush(department);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void updateDepartmentStatus_shouldRejectMissingDepartment(boolean active) {
+        when(departmentRepository.findById(99L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                DepartmentNotFoundException.class,
+                () -> service.updateDepartmentStatus(
+                        99L,
+                        new UpdateDepartmentStatusRequest(active)
+                )
+        );
+
+        verify(departmentRepository, never())
+                .saveAndFlush(any(Department.class));
+    }
+
+    @Test
+    void updateDepartmentStatus_shouldRejectNullStatusBeforeDatabaseAccess() {
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.updateDepartmentStatus(
+                        1L,
+                        new UpdateDepartmentStatusRequest(null)
+                )
+        );
+
+        assertEquals(
+                "Active status must be provided",
+                exception.getMessage()
+        );
+
+        verifyNoInteractions(departmentRepository);
+    }
+
     private Department storedDepartment(Long id, String name,boolean active){
         Department department1 = mock(Department.class);
 
         when(department1.getId()).thenReturn(id);
         when(department1.getName()).thenReturn(name);
-        when(department1.isActive()).thenReturn(active);
+        when(department1.getActive()).thenReturn(active);
         when(department1.getCreatedAt()).thenReturn(localDateTime);
 
         return department1;

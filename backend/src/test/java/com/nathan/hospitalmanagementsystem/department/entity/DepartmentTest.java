@@ -22,7 +22,7 @@ public class DepartmentTest {
         assertAll(
                 ()-> assertEquals("Cardiologist",department.getName()),
                 ()-> assertEquals("Heart-related consultations",department.getDescription()),
-                ()-> assertTrue(department.isActive())
+                ()-> assertTrue(department.getActive())
         );
     }
 
@@ -99,7 +99,7 @@ public class DepartmentTest {
                         "Specialist heart consultations",
                         department.getDescription()
                 ),
-                () -> assertTrue(department.isActive())
+                () -> assertTrue(department.getActive())
         );
     }
 
@@ -161,7 +161,7 @@ public class DepartmentTest {
                         "Heart consultations",
                         department.getDescription()
                 ),
-                () -> assertTrue(department.isActive())
+                () -> assertTrue(department.getActive())
         );
     }
 

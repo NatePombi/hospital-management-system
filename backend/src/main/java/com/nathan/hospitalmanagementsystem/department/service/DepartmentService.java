@@ -4,6 +4,7 @@ import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentStatusRequest;
 import com.nathan.hospitalmanagementsystem.department.entity.Department;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentAlreadyExistsException;
 import com.nathan.hospitalmanagementsystem.department.exception.DepartmentNotFoundException;
@@ -97,6 +98,28 @@ public class DepartmentService {
 
             throw ex;
         }
+
+    }
+
+    @Transactional
+    public DepartmentResponse updateDepartmentStatus(Long id, UpdateDepartmentStatusRequest status){
+
+        if(status.active() == null){
+            throw new IllegalArgumentException("Active status must be provided");
+        }
+
+        Department department = departmentRepository.findById(id).orElseThrow(()-> new DepartmentNotFoundException(id));
+
+        if(status.active()){
+            department.Activate();
+        }
+        else {
+            department.Deactivate();
+        }
+
+        Department savedDepartment = departmentRepository.saveAndFlush(department);
+
+        return DepartmentResponse.from(savedDepartment);
 
     }
 

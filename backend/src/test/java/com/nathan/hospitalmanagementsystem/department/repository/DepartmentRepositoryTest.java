@@ -52,7 +52,7 @@ public class DepartmentRepositoryTest {
                 ()-> assertEquals(id,reloaded.getId()),
                 ()-> assertEquals("Cardiologist",reloaded.getName()),
                 ()-> assertEquals("Heart-related consultations",reloaded.getDescription()),
-                ()-> assertTrue(reloaded.isActive()),
+                ()-> assertTrue(reloaded.getActive()),
                 ()-> assertNotNull(reloaded.getCreatedAt())
         );
 

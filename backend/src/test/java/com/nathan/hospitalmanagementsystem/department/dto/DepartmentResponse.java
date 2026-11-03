@@ -17,7 +17,7 @@ public record DepartmentResponse(
                 department.getId(),
                 department.getName(),
                 department.getDescription(),
-                department.isActive(),
+                department.getActive(),
                 department.getCreatedAt()
         );
     }

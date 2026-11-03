@@ -4,6 +4,8 @@ import com.nathan.hospitalmanagementsystem.common.dto.PaginatedResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.CreateDepartmentRequest;
 import com.nathan.hospitalmanagementsystem.department.dto.DepartmentResponse;
 import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentRequest;
+import com.nathan.hospitalmanagementsystem.department.dto.UpdateDepartmentStatusRequest;
+import com.nathan.hospitalmanagementsystem.department.entity.Department;
 import com.nathan.hospitalmanagementsystem.department.service.DepartmentService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -64,6 +66,11 @@ public class DepartmentController {
     @PutMapping("/update/{id}")
     public ResponseEntity<DepartmentResponse> updateDepartment(@PathVariable  @Positive(message = "Department ID must be greater than zero") Long id, @Valid @RequestBody UpdateDepartmentRequest request){
         return ResponseEntity.ok(departmentService.updateDepartmentById(id, request));
+    }
+
+    @PatchMapping("/update/status/{id}")
+    public ResponseEntity<DepartmentResponse> updateDepartmentStatus(@PathVariable @Positive(message = "Department ID must be greater than zero") Long id , @Valid @RequestBody UpdateDepartmentStatusRequest request){
+        return ResponseEntity.ok(departmentService.updateDepartmentStatus(id,request));
     }
 
 }
