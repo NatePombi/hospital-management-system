@@ -8,7 +8,7 @@ public record DepartmentResponse(
         Long id,
         String name,
         String description,
-        boolean active,
+        Boolean active,
         LocalDateTime createdAt
 ) {
     public static DepartmentResponse from(Department department) {
@@ -16,7 +16,7 @@ public record DepartmentResponse(
                 department.getId(),
                 department.getName(),
                 department.getDescription(),
-                department.isActive(),
+                department.getActive(),
                 department.getCreatedAt()
         );
     }

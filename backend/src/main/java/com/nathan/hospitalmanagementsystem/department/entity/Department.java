@@ -23,7 +23,7 @@ public class Department {
     @Column(name = "description", length = 500)
     private String description;
     @Column(name = "active", nullable = false)
-    private boolean active = true;
+    private Boolean active = true;
     @CurrentTimestamp
     @Column(nullable = false,name = "created_at")
     private LocalDateTime createdAt;
